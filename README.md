@@ -1,6 +1,6 @@
 # pg_help
 
-A PostgreSQL function that ports the spirit of SQL Server's `sp_help` stored procedure to Postgres. Returns a single result set describing a table's columns, constraints, and indexes.
+A PostgreSQL function that ports the spirit of SQL Server's `sp_help` stored procedure to Postgres. Returns a single result set describing a table's structure — columns, constraints, indexes, triggers, and references.
 
 ## Why?
 
@@ -16,27 +16,82 @@ psql -d mydb -f pg_help.sql
 
 ## Usage
 
-Pass the fully-qualified table name (`schema.table`) as a string:
+Pass a schema-qualified table name, or just the table name to use the current schema:
 
 ```sql
-select * from pg_help('public.users');
+select * from pg_help('public.orders');
+
+select * from pg_help('orders');   -- uses current_schema()
+```
+
+## Example output
+
+```sql
+select * from pg_help('orders');
+```
+
+```
+ col1                    | col2                                                  | col3                                                        | col4
+-------------------------+-------------------------------------------------------+-------------------------------------------------------------+-----------------------------------------
+ >> Table >>             |                                                       |                                                             |
+                         |                                                       |                                                             |
+ orders                  | Customer orders. Each order belongs to one customer.  |                                                             |
+                         |                                                       |                                                             |
+ >> Columns >>           |                                                       |                                                             |
+                         |                                                       |                                                             |
+ -- Column --            | -- Type --                                            | -- Nullable --                                              | -- Default --
+ order_id                | INTEGER                                               | NOT NULL                                                    | nextval('orders_order_id_seq'::regclass)
+ customer_id             | INTEGER                                               | NOT NULL                                                    |
+ status                  | VARCHAR(20)                                           | NOT NULL                                                    | 'pending'::character varying
+ notes                   | TEXT                                                  | NULL                                                        |
+ ordered_at              | TIMESTAMPTZ                                           | NOT NULL                                                    | now()
+ shipped_at              | TIMESTAMPTZ                                           | NULL                                                        |
+                         |                                                       |                                                             |
+ >> Constraints >>       |                                                       |                                                             |
+                         |                                                       |                                                             |
+ PRIMARY KEY             | orders_pkey                                           | PRIMARY KEY (order_id)                                      |
+ FOREIGN KEY             | orders_customer_fk                                    | FOREIGN KEY (customer_id) REFERENCES customers(customer_id) |
+ CHECK                   | orders_status_ck                                      | CHECK (status IN ('pending','confirmed','shipped','cancelled'))|
+                         |                                                       |                                                             |
+ >> Indexes >>           |                                                       |                                                             |
+                         |                                                       |                                                             |
+ UNIQUE BTREE            | orders_pkey                                           | (order_id)                                                  |
+ BTREE                   | orders_customer_id_idx                                | (customer_id)                                               |
+ BTREE                   | orders_status_idx                                     | (status)                                                    |
+                         |                                                       |                                                             |
+ >> Triggers >>          |                                                       |                                                             |
+                         |                                                       |                                                             |
+ orders_lock_closed_trg  | BEFORE ROW                                            | UPDATE                                                      | public.orders_lock_closed
+                         |                                                       |                                                             |
+ >> Referenced By >>     |                                                       |                                                             |
+                         |                                                       |                                                             |
+ public.order_items      | order_items_order_fk                                  | FOREIGN KEY (order_id) REFERENCES orders(order_id)          |
 ```
 
 ## Output
 
-Four `varchar(500)` columns (`col1`, `col2`, `col3`, `col4`) containing section headers and rows, in this order:
+Four `text` columns (`col1`–`col4`) containing section headers and data rows, in this order:
 
-- **Table** — the table name
-- **Columns** — column name, data type, nullability
-- **Constraints** — primary keys, foreign keys, checks, uniques
-- **Indexes** — index name, columns, optional `WHERE` clause
+| Section | col1 | col2 | col3 | col4 |
+|---|---|---|---|---|
+| **Table** | table name | comment | | |
+| **Columns** | column name | data type | `NOT NULL` / `NULL` | default expression |
+| **Constraints** | type (`PRIMARY KEY`, `FOREIGN KEY`, `CHECK`, `UNIQUE`) | constraint name | definition | |
+| **Indexes** | type (`BTREE`, `UNIQUE BTREE`, etc.) | index name | columns | `WHERE` clause (partial indexes) |
+| **Triggers** | trigger name | timing + level (`BEFORE ROW`, `AFTER STATEMENT`, etc.) | events (`INSERT OR UPDATE`) | function name |
+| **Referenced By** | referencing table | constraint name | definition | |
+
+If the table does not exist, a single row is returned with a `Table not found` message.
 
 ## Requirements
 
-PostgreSQL 9.x or later. Uses standard catalogs (`pg_constraint`, `pg_index`, `pg_class`, `information_schema.columns`) so no extensions are needed.
+PostgreSQL 12 or later. No extensions required.
 
-## Notes
+## Examples
 
-- The table name must be fully qualified (e.g. `public.users`, not just `users`).
-- Output columns are fixed-width `varchar(500)`, mimicking the `sp_help` result-grid style.
-- For interactive use in `psql`, `\d+ tablename` is usually a better choice. `pg_help` is most useful when you need the metadata as a queryable result set.
+The `examples/` folder contains a sample schema (two schemas, seven tables, three triggers) that exercises every section of the output:
+
+```bash
+psql -d mydb -f pg_help.sql
+psql -d mydb -f examples/example-schema.sql
+```
