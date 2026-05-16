@@ -31,41 +31,41 @@ select * from pg_help('orders');
 ```
 
 ```
- col1                    | col2                                                  | col3                                                        | col4
--------------------------+-------------------------------------------------------+-------------------------------------------------------------+-----------------------------------------
- >> Table >>             |                                                       |                                                             |
-                         |                                                       |                                                             |
- orders                  | Customer orders. Each order belongs to one customer.  |                                                             |
-                         |                                                       |                                                             |
- >> Columns >>           |                                                       |                                                             |
-                         |                                                       |                                                             |
- -- Column --            | -- Type --                                            | -- Nullable --                                              | -- Default --
- order_id                | INTEGER                                               | NOT NULL                                                    | nextval('orders_order_id_seq'::regclass)
- customer_id             | INTEGER                                               | NOT NULL                                                    |
- status                  | VARCHAR(20)                                           | NOT NULL                                                    | 'pending'::character varying
- notes                   | TEXT                                                  | NULL                                                        |
- ordered_at              | TIMESTAMPTZ                                           | NOT NULL                                                    | now()
- shipped_at              | TIMESTAMPTZ                                           | NULL                                                        |
-                         |                                                       |                                                             |
- >> Constraints >>       |                                                       |                                                             |
-                         |                                                       |                                                             |
- PRIMARY KEY             | orders_pkey                                           | PRIMARY KEY (order_id)                                      |
- FOREIGN KEY             | orders_customer_fk                                    | FOREIGN KEY (customer_id) REFERENCES customers(customer_id) |
- CHECK                   | orders_status_ck                                      | CHECK (status IN ('pending','confirmed','shipped','cancelled'))|
-                         |                                                       |                                                             |
- >> Indexes >>           |                                                       |                                                             |
-                         |                                                       |                                                             |
- UNIQUE BTREE            | orders_pkey                                           | (order_id)                                                  |
- BTREE                   | orders_customer_id_idx                                | (customer_id)                                               |
- BTREE                   | orders_status_idx                                     | (status)                                                    |
-                         |                                                       |                                                             |
- >> Triggers >>          |                                                       |                                                             |
-                         |                                                       |                                                             |
- orders_lock_closed_trg  | BEFORE ROW                                            | UPDATE                                                      | public.orders_lock_closed
-                         |                                                       |                                                             |
- >> Referenced By >>     |                                                       |                                                             |
-                         |                                                       |                                                             |
- public.order_items      | order_items_order_fk                                  | FOREIGN KEY (order_id) REFERENCES orders(order_id)          |
+ col1                    | col2                   | col3                                                        | col4
+-------------------------+------------------------+-------------------------------------------------------------+-----------------------------------------
+ >> Table >>             |                        |                                                             |
+                         |                        |                                                             |
+ orders                  | Customer orders.       |                                                             |
+                         |                        |                                                             |
+ >> Columns >>           |                        |                                                             |
+                         |                        |                                                             |
+ -- Column --            | -- Type --             | -- Nullable --                                              | -- Default --
+ order_id                | INTEGER                | NOT NULL                                                    | nextval('orders_order_id_seq'::regclass)
+ customer_id             | INTEGER                | NOT NULL                                                    |
+ status                  | VARCHAR(20)            | NOT NULL                                                    | 'pending'::character varying
+ notes                   | TEXT                   | NULL                                                        |
+ ordered_at              | TIMESTAMPTZ            | NOT NULL                                                    | now()
+ shipped_at              | TIMESTAMPTZ            | NULL                                                        |
+                         |                        |                                                             |
+ >> Constraints >>       |                        |                                                             |
+                         |                        |                                                             |
+ PRIMARY KEY             | orders_pkey            | PRIMARY KEY (order_id)                                      |
+ FOREIGN KEY             | orders_customer_fk     | FOREIGN KEY (customer_id) REFERENCES customers(customer_id) |
+ CHECK                   | orders_status_ck       | CHECK ((status = ANY (ARRAY['pending','confirmed',...])))   |
+                         |                        |                                                             |
+ >> Indexes >>           |                        |                                                             |
+                         |                        |                                                             |
+ UNIQUE BTREE            | orders_pkey            | (order_id)                                                  |
+ BTREE                   | orders_customer_id_idx | (customer_id)                                               |
+ BTREE                   | orders_status_idx      | (status)                                                    |
+                         |                        |                                                             |
+ >> Triggers >>          |                        |                                                             |
+                         |                        |                                                             |
+ orders_lock_closed_trg  | BEFORE ROW             | UPDATE                                                      | public.orders_lock_closed
+                         |                        |                                                             |
+ >> Referenced By >>     |                        |                                                             |
+                         |                        |                                                             |
+ public.order_items      | order_items_order_fk   | FOREIGN KEY (order_id) REFERENCES orders(order_id)          |
 ```
 
 ## Output

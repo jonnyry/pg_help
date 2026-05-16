@@ -79,7 +79,7 @@ create table public.orders
     constraint orders_status_ck    check (status in ('pending', 'confirmed', 'shipped', 'cancelled'))
 );
 
-comment on table public.orders is 'Customer orders. Each order belongs to one customer.';
+comment on table public.orders is 'Customer orders.';
 
 create index orders_customer_id_idx on public.orders (customer_id);
 create index orders_status_idx      on public.orders (status);
