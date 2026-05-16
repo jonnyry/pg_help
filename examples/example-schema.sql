@@ -1,4 +1,4 @@
--- Example tables for testing pg_help.
+-- Example schema for testing pg_help.
 -- Run pg_help.sql first, then this file.
 --
 -- Usage:
@@ -181,3 +181,64 @@ create table hr.job_history
 );
 
 comment on table hr.job_history is 'Historical record of employee roles and department transfers.';
+
+-- =========================================================================
+-- Trigger functions and triggers
+-- =========================================================================
+
+-- -----------------------------------------------------------------------
+-- public.customers — normalise email to lowercase on insert or update
+-- -----------------------------------------------------------------------
+
+create or replace function public.customers_normalize_email()
+returns trigger as $$
+begin
+    new.email := lower(trim(new.email));
+    return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists customers_normalize_email_trg on public.customers;
+
+create trigger customers_normalize_email_trg
+before insert or update of email on public.customers
+for each row execute function public.customers_normalize_email();
+
+-- -----------------------------------------------------------------------
+-- public.orders — prevent modification of shipped or cancelled orders
+-- -----------------------------------------------------------------------
+
+create or replace function public.orders_lock_closed()
+returns trigger as $$
+begin
+    if old.status in ('shipped', 'cancelled') then
+        raise exception 'Cannot modify a % order.', old.status;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists orders_lock_closed_trg on public.orders;
+
+create trigger orders_lock_closed_trg
+before update on public.orders
+for each row execute function public.orders_lock_closed();
+
+-- -----------------------------------------------------------------------
+-- hr.employees — trim whitespace from names on insert or update
+-- -----------------------------------------------------------------------
+
+create or replace function hr.employees_normalize_name()
+returns trigger as $$
+begin
+    new.first_name := trim(new.first_name);
+    new.last_name  := trim(new.last_name);
+    return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists employees_normalize_name_trg on hr.employees;
+
+create trigger employees_normalize_name_trg
+before insert or update of first_name, last_name on hr.employees
+for each row execute function hr.employees_normalize_name();

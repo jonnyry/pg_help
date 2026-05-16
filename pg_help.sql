@@ -1,4 +1,3 @@
-
 create or replace function pg_help
 (
 	_table_name text
@@ -64,7 +63,8 @@ begin
 
 	return query values
 		('>> Columns >>', '', '', ''),
-		('', '', '', '');
+		('', '', '', ''),
+		('-- Column --', '-- Type --', '-- Nullable --', '-- Default --');
 
 	return query
 	select
@@ -148,6 +148,42 @@ begin
 	  and t.relname = _table_only
 	group by i.relname, ix.indisunique, ix.indisprimary, am.amname, ix.indpred, ix.indrelid
 	order by ix.indisprimary desc, i.relname;
+
+	-- -----------------------------------------------------------------------
+	-- >> Triggers >>
+	-- col1=name  col2=timing+level  col3=events  col4=function
+	-- -----------------------------------------------------------------------
+
+	return query values
+		('', '', '', ''),
+		('>> Triggers >>', '', '', ''),
+		('', '', '', '');
+
+	return query
+	select
+		t.tgname::text,
+		case
+			when t.tgtype::integer & 64 > 0 then 'INSTEAD OF'
+			when t.tgtype::integer & 2  > 0 then 'BEFORE'
+			else 'AFTER'
+		end || ' ' ||
+		case when t.tgtype::integer & 1 > 0 then 'ROW' else 'STATEMENT' end,
+		array_to_string(array_remove(array[
+			case when t.tgtype::integer & 4  > 0 then 'INSERT'   end,
+			case when t.tgtype::integer & 16 > 0 then 'UPDATE'   end,
+			case when t.tgtype::integer & 8  > 0 then 'DELETE'   end,
+			case when t.tgtype::integer & 32 > 0 then 'TRUNCATE' end
+		], null), ' OR '),
+		pn.nspname || '.' || p.proname
+	from pg_trigger t
+	inner join pg_class c on c.oid = t.tgrelid
+	inner join pg_namespace n on n.oid = c.relnamespace
+	inner join pg_proc p on p.oid = t.tgfoid
+	inner join pg_namespace pn on pn.oid = p.pronamespace
+	where n.nspname = _schema_name
+	  and c.relname = _table_only
+	  and not t.tgisinternal
+	order by t.tgname;
 
 	-- -----------------------------------------------------------------------
 	-- >> Referenced By >>
