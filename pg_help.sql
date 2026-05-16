@@ -1,38 +1,44 @@
 
 create or replace function pg_help
 (
-	_table_name varchar(500)
+	_table_name text
 )
 returns table
 (
-	col1 varchar(500),
-	col2 varchar(500),
-	col3 varchar(500),
-	col4 varchar(500)
+	col1 text,
+	col2 text,
+	col3 text,
+	col4 text
 )
 as $$
 declare
-	_schema_name varchar(500);
-	_table_only  varchar(500);
+	_schema_name text;
+	_table_only  text;
 	_obj_comment text;
 begin
 
-	_schema_name := split_part(_table_name, '.', 1);
-	_table_only  := split_part(_table_name, '.', 2);
+	if position('.' in _table_name) > 0 then
+		_schema_name := split_part(_table_name, '.', 1);
+		_table_only  := split_part(_table_name, '.', 2);
+	else
+		_schema_name := current_schema();
+		_table_only  := _table_name;
+	end if;
 
-	-- suppress the "does not exist, skipping" notice from DROP TABLE IF EXISTS
-	set local client_min_messages = warning;
-
-	-- guard against a temp table left over from a previous errored call
-	drop table if exists _pg_help_results;
-
-	create temp table _pg_help_results
-	(
-		col1 varchar(500),
-		col2 varchar(500),
-		col3 varchar(500),
-		col4 varchar(500)
-	);
+	-- early-exit if the table doesn't exist
+	if not exists (
+		select 1
+		from pg_class c
+		inner join pg_namespace n on n.oid = c.relnamespace
+		where n.nspname = _schema_name
+		  and c.relname = _table_only
+		  and c.relkind in ('r', 'p', 'v', 'm', 'f')
+	) then
+		return query select
+			'Table not found: ' || _schema_name || '.' || _table_only,
+			'', '', '';
+		return;
+	end if;
 
 	-- -----------------------------------------------------------------------
 	-- >> Table >>
@@ -45,24 +51,24 @@ begin
 	where n.nspname = _schema_name
 	  and c.relname = _table_only;
 
-	insert into _pg_help_results (col1, col2, col3, col4) values
-	('>> Table >>', '', '', ''),
-	('', '', '', ''),
-	(_table_name, coalesce(_obj_comment, ''), '', ''),
-	('', '', '', '');
+	return query values
+		('>> Table >>', '', '', ''),
+		('', '', '', ''),
+		(_table_name, coalesce(_obj_comment, ''), '', ''),
+		('', '', '', '');
 
 	-- -----------------------------------------------------------------------
 	-- >> Columns >>
 	-- col1=name  col2=type  col3=nullable  col4=default
 	-- -----------------------------------------------------------------------
 
-	insert into _pg_help_results (col1, col2, col3, col4) values
-	('>> Columns >>', '', '', ''),
-	('', '', '', '');
+	return query values
+		('>> Columns >>', '', '', ''),
+		('', '', '', '');
 
-	insert into _pg_help_results (col1, col2, col3, col4)
+	return query
 	select
-		a.attname,
+		a.attname::text,
 		upper(
 			replace(replace(replace(replace(replace(
 				pg_catalog.format_type(a.atttypid, a.atttypmod),
@@ -89,12 +95,12 @@ begin
 	-- col1=type  col2=name  col3=definition
 	-- -----------------------------------------------------------------------
 
-	insert into _pg_help_results (col1, col2, col3, col4) values
-	('', '', '', ''),
-	('>> Constraints >>', '', '', ''),
-	('', '', '', '');
+	return query values
+		('', '', '', ''),
+		('>> Constraints >>', '', '', ''),
+		('', '', '', '');
 
-	insert into _pg_help_results (col1, col2, col3, col4)
+	return query
 	select
 		case
 			when contype = 'p' then 'PRIMARY KEY'
@@ -102,7 +108,7 @@ begin
 			when contype = 'c' then 'CHECK'
 			when contype = 'u' then 'UNIQUE'
 		end,
-		conname,
+		conname::text,
 		pg_get_constraintdef(c.oid),
 		''
 	from pg_constraint c
@@ -120,15 +126,15 @@ begin
 	-- col1=type  col2=name  col3=columns  col4=where clause
 	-- -----------------------------------------------------------------------
 
-	insert into _pg_help_results (col1, col2, col3, col4) values
-	('', '', '', ''),
-	('>> Indexes >>', '', '', ''),
-	('', '', '', '');
+	return query values
+		('', '', '', ''),
+		('>> Indexes >>', '', '', ''),
+		('', '', '', '');
 
-	insert into _pg_help_results (col1, col2, col3, col4)
+	return query
 	select
 		case when ix.indisunique then 'UNIQUE ' else '' end || upper(am.amname),
-		i.relname,
+		i.relname::text,
 		'(' || array_to_string(array_agg(a.attname order by k.pos), ', ') || ')',
 		coalesce('WHERE ' || pg_get_expr(ix.indpred, ix.indrelid), '')
 	from pg_index ix
@@ -148,15 +154,15 @@ begin
 	-- col1=from_table  col2=constraint_name  col3=definition
 	-- -----------------------------------------------------------------------
 
-	insert into _pg_help_results (col1, col2, col3, col4) values
-	('', '', '', ''),
-	('>> Referenced By >>', '', '', ''),
-	('', '', '', '');
+	return query values
+		('', '', '', ''),
+		('>> Referenced By >>', '', '', ''),
+		('', '', '', '');
 
-	insert into _pg_help_results (col1, col2, col3, col4)
+	return query
 	select
 		n2.nspname || '.' || t2.relname,
-		c.conname,
+		c.conname::text,
 		pg_get_constraintdef(c.oid),
 		''
 	from pg_constraint c
@@ -168,12 +174,6 @@ begin
 	  and n.nspname = _schema_name
 	  and t.relname = _table_only
 	order by n2.nspname || '.' || t2.relname, c.conname;
-
-	return query
-	select *
-	from _pg_help_results;
-
-	drop table _pg_help_results;
 
 end;
 $$ language plpgsql;
