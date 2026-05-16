@@ -1,0 +1,15 @@
+{
+  "name": "pg_help",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-ossdata.vscode-pgsql"
+      ]
+    }
+  },
+  "postStartCommand": "sudo service postgresql start",
+  "remoteUser": "vscode"
+}
