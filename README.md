@@ -68,21 +68,6 @@ select * from pg_help('orders');
  public.order_items      | order_items_order_fk   | FOREIGN KEY (order_id) REFERENCES orders(order_id)          |
 ```
 
-## Output
-
-Four `text` columns (`col1`–`col4`) containing section headers and data rows, in this order:
-
-| Section | col1 | col2 | col3 | col4 |
-|---|---|---|---|---|
-| **Table** | table name | comment | | |
-| **Columns** | column name | data type | `NOT NULL` / `NULL` | default expression |
-| **Constraints** | type (`PRIMARY KEY`, `FOREIGN KEY`, `CHECK`, `UNIQUE`) | constraint name | definition | |
-| **Indexes** | type (`BTREE`, `UNIQUE BTREE`, etc.) | index name | columns | `WHERE` clause (partial indexes) |
-| **Triggers** | trigger name | timing + level (`BEFORE ROW`, `AFTER STATEMENT`, etc.) | events (`INSERT OR UPDATE`) | function name |
-| **Referenced By** | referencing table | constraint name | definition | |
-
-If the table does not exist, a single row is returned with a `Table not found` message.
-
 ## Requirements
 
 PostgreSQL 12 or later. No extensions required.
