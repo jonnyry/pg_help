@@ -111,8 +111,8 @@ begin
 		inner join pg_namespace n on t.relnamespace = n.oid
 		where t.relkind = 'r'
 		and n.nspname || '.' || t.relname = _table_name
-		group by t.relname, i.relname, ix.indisprimary, ix.indisunique, pg_get_expr(ix.indpred, ix.indrelid)
-	) indexes
+		group by t.relname, i.relname, ix.indisprimary, ix.indisunique, ix.indpred, pg_get_expr(ix.indpred, ix.indrelid)
+	) indexes;
 
 	return query
 	select * 
