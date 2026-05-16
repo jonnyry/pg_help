@@ -11,9 +11,22 @@ returns table
 	col4 varchar(500)
 )
 as $$
+declare
+	_schema_name varchar(500);
+	_table_only  varchar(500);
+	_obj_comment text;
 begin
 
-	create temp table results
+	_schema_name := split_part(_table_name, '.', 1);
+	_table_only  := split_part(_table_name, '.', 2);
+
+	-- suppress the "does not exist, skipping" notice from DROP TABLE IF EXISTS
+	set local client_min_messages = warning;
+
+	-- guard against a temp table left over from a previous errored call
+	drop table if exists _pg_help_results;
+
+	create temp table _pg_help_results
 	(
 		col1 varchar(500),
 		col2 varchar(500),
@@ -21,105 +34,146 @@ begin
 		col4 varchar(500)
 	);
 
-	insert into results (col1, col2, col3, col4) values 
+	-- -----------------------------------------------------------------------
+	-- >> Table >>
+	-- -----------------------------------------------------------------------
+
+	select obj_description(c.oid, 'pg_class')
+	into _obj_comment
+	from pg_class c
+	inner join pg_namespace n on n.oid = c.relnamespace
+	where n.nspname = _schema_name
+	  and c.relname = _table_only;
+
+	insert into _pg_help_results (col1, col2, col3, col4) values
 	('>> Table >>', '', '', ''),
 	('', '', '', ''),
-	(_table_name, '', '', ''),
+	(_table_name, coalesce(_obj_comment, ''), '', ''),
 	('', '', '', '');
 
-	insert into results (col1, col2, col3, col4) values 
+	-- -----------------------------------------------------------------------
+	-- >> Columns >>
+	-- col1=name  col2=type  col3=nullable  col4=default
+	-- -----------------------------------------------------------------------
+
+	insert into _pg_help_results (col1, col2, col3, col4) values
 	('>> Columns >>', '', '', ''),
 	('', '', '', '');
 
-	insert into results (col1, col2, col3, col4)
-	select 
-		column_name,
-		upper(replace(data_type, 'character varying', 'varchar')) || coalesce('(' || character_maximum_length || ')', ''),
-		case 
-			when is_nullable = 'YES' then 'NULL' 
-			else 'NOT NULL' 
-		end as column_expr,
-		''
-	from information_schema.columns c
-	where c.table_schema || '.' || c.table_name = _table_name
-	order by c.ordinal_position;
-	
-	
-	insert into results (col1, col2, col3, col4)
-	values 
+	insert into _pg_help_results (col1, col2, col3, col4)
+	select
+		a.attname,
+		upper(
+			replace(replace(replace(replace(replace(
+				pg_catalog.format_type(a.atttypid, a.atttypmod),
+				'character varying', 'varchar'),
+				'timestamp without time zone', 'timestamp'),
+				'timestamp with time zone', 'timestamptz'),
+				'time without time zone', 'time'),
+				'time with time zone', 'timetz')
+		),
+		case when a.attnotnull then 'NOT NULL' else 'NULL' end,
+		coalesce(pg_get_expr(d.adbin, d.adrelid), '')
+	from pg_catalog.pg_attribute a
+	inner join pg_catalog.pg_class t on t.oid = a.attrelid
+	inner join pg_catalog.pg_namespace n on n.oid = t.relnamespace
+	left join pg_catalog.pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+	where n.nspname = _schema_name
+	  and t.relname = _table_only
+	  and a.attnum > 0
+	  and not a.attisdropped
+	order by a.attnum;
+
+	-- -----------------------------------------------------------------------
+	-- >> Constraints >>
+	-- col1=type  col2=name  col3=definition
+	-- -----------------------------------------------------------------------
+
+	insert into _pg_help_results (col1, col2, col3, col4) values
 	('', '', '', ''),
 	('>> Constraints >>', '', '', ''),
 	('', '', '', '');
-	
-	insert into results (col1, col2, col3, col4)
-	select 
-		constraint_type,
-		constraint_name,
-		constraint_definition,
+
+	insert into _pg_help_results (col1, col2, col3, col4)
+	select
+		case
+			when contype = 'p' then 'PRIMARY KEY'
+			when contype = 'f' then 'FOREIGN KEY'
+			when contype = 'c' then 'CHECK'
+			when contype = 'u' then 'UNIQUE'
+		end,
+		conname,
+		pg_get_constraintdef(c.oid),
 		''
-	from
-	(
-		select 
-			case
-				when contype = 'p' then 1
-				when contype = 'f' then 2
-				when contype = 'c' then 3
-				when contype = 'u' then 4
-			end as order_by,
-			case
-				when contype = 'p' then 'PRIMARY KEY'
-				when contype = 'f' then 'FOREIGN KEY'
-				when contype = 'c' then 'CHECK'
-				when contype = 'u' then 'UNIQUE'
-			end as constraint_type,
-			conrelid::regclass AS table_from, 
-			conname as constraint_name, 
-			pg_get_constraintdef(c.oid) as constraint_definition
-		from pg_constraint c
-		inner join pg_namespace n on n.oid = c.connamespace
-		where contype in ('f','p','c','u') 
-		order by order_by, constraint_name
-	) a
-	where cast(a.table_from as varchar) = _table_name;
+	from pg_constraint c
+	inner join pg_class t on t.oid = c.conrelid
+	inner join pg_namespace n on n.oid = c.connamespace
+	where n.nspname = _schema_name
+	  and t.relname = _table_only
+	  and contype in ('p', 'f', 'c', 'u')
+	order by
+		case contype when 'p' then 1 when 'f' then 2 when 'c' then 3 when 'u' then 4 end,
+		conname;
 
+	-- -----------------------------------------------------------------------
+	-- >> Indexes >>
+	-- col1=type  col2=name  col3=columns  col4=where clause
+	-- -----------------------------------------------------------------------
 
-	insert into results (col1, col2, col3, col4)
-	values 
+	insert into _pg_help_results (col1, col2, col3, col4) values
 	('', '', '', ''),
 	('>> Indexes >>', '', '', ''),
 	('', '', '', '');
-	
-	insert into results (col1, col2, col3, col4)
+
+	insert into _pg_help_results (col1, col2, col3, col4)
 	select
-		'',
-		index_name,
-		column_names,
-		where_clause
-	from
-	(
-		select
-		    i.relname as index_name,
-		    '(' || array_to_string(array_agg(a.attname), ', ') || ')' as column_names,
-		    coalesce('WHERE ' || pg_get_expr(ix.indpred, ix.indrelid), '') as where_clause,
-			ix.indisprimary,
-			ix.indisunique,
-			ix.indpred
-		from pg_class i 
-		inner join pg_index ix on i.oid = ix.indexrelid 
-		inner join pg_class t on t.oid = ix.indrelid
-		inner join pg_attribute a on a.attrelid = t.oid and a.attnum = any(ix.indkey)
-		inner join pg_namespace n on t.relnamespace = n.oid
-		where t.relkind = 'r'
-		and n.nspname || '.' || t.relname = _table_name
-		group by t.relname, i.relname, ix.indisprimary, ix.indisunique, ix.indpred, pg_get_expr(ix.indpred, ix.indrelid)
-	) indexes;
+		case when ix.indisunique then 'UNIQUE ' else '' end || upper(am.amname),
+		i.relname,
+		'(' || array_to_string(array_agg(a.attname order by k.pos), ', ') || ')',
+		coalesce('WHERE ' || pg_get_expr(ix.indpred, ix.indrelid), '')
+	from pg_index ix
+	inner join pg_class i on i.oid = ix.indexrelid
+	inner join pg_class t on t.oid = ix.indrelid
+	inner join pg_namespace n on t.relnamespace = n.oid
+	inner join pg_am am on am.oid = i.relam
+	inner join pg_attribute a on a.attrelid = t.oid
+	inner join lateral unnest(ix.indkey) with ordinality as k(attnum, pos) on k.attnum = a.attnum
+	where n.nspname = _schema_name
+	  and t.relname = _table_only
+	group by i.relname, ix.indisunique, ix.indisprimary, am.amname, ix.indpred, ix.indrelid
+	order by ix.indisprimary desc, i.relname;
+
+	-- -----------------------------------------------------------------------
+	-- >> Referenced By >>
+	-- col1=from_table  col2=constraint_name  col3=definition
+	-- -----------------------------------------------------------------------
+
+	insert into _pg_help_results (col1, col2, col3, col4) values
+	('', '', '', ''),
+	('>> Referenced By >>', '', '', ''),
+	('', '', '', '');
+
+	insert into _pg_help_results (col1, col2, col3, col4)
+	select
+		n2.nspname || '.' || t2.relname,
+		c.conname,
+		pg_get_constraintdef(c.oid),
+		''
+	from pg_constraint c
+	inner join pg_class t on t.oid = c.confrelid
+	inner join pg_namespace n on n.oid = t.relnamespace
+	inner join pg_class t2 on t2.oid = c.conrelid
+	inner join pg_namespace n2 on n2.oid = t2.relnamespace
+	where c.contype = 'f'
+	  and n.nspname = _schema_name
+	  and t.relname = _table_only
+	order by n2.nspname || '.' || t2.relname, c.conname;
 
 	return query
-	select * 
-	from results;
-	
-	drop table results;
+	select *
+	from _pg_help_results;
+
+	drop table _pg_help_results;
 
 end;
 $$ language plpgsql;
-
