@@ -1,10 +1,10 @@
 # pg_help
 
-A PostgreSQL function that ports the spirit of SQL Server's `sp_help` stored procedure to Postgres. Returns a single result set describing a table's structure — columns, constraints, indexes, triggers, and references.
+A PostgreSQL function that ports the spirit of SQL Server's `sp_help` stored procedure to Postgres. Returns a single result set describing the structure of a table, view, or materialized view.
 
 ## Why?
 
-In SQL Server, `sp_help 'mytable'` is the quickest way to get a summary of a table's structure. Postgres has `\d tablename` in `psql`, but that's a client command — you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_help` fills that gap by returning the same kind of information as a regular result set.
+In SQL Server, `sp_help 'mytable'` is the quickest way to get a summary of a relation's structure. Postgres has `\d name` in `psql`, but that's a client command — you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_help` fills that gap by returning the same kind of information as a regular result set.
 
 ## Installation
 
@@ -16,12 +16,16 @@ psql -d mydb -f pg_help.sql
 
 ## Usage
 
-Pass a schema-qualified table name, or just the table name to use the current schema:
+Pass a schema-qualified name, or just the name to use the current schema:
 
 ```sql
 select * from pg_help('public.orders');
 
-select * from pg_help('orders');   -- uses current_schema()
+select * from pg_help('orders');             -- uses current_schema()
+
+select * from pg_help('public.customer_orders');    -- view
+
+select * from pg_help('public.product_sales');      -- materialized view
 ```
 
 ## Example output
@@ -31,7 +35,7 @@ select * from pg_help('orders');
 ```
 
 ```
- col1                    | col2                   | col3                                                        | col4
+ a                       | b                      | c                                                           | d
 -------------------------+------------------------+-------------------------------------------------------------+-----------------------------------------
  >> Table >>             |                        |                                                             |
                          |                        |                                                             |
@@ -39,7 +43,6 @@ select * from pg_help('orders');
                          |                        |                                                             |
  >> Columns >>           |                        |                                                             |
                          |                        |                                                             |
- -- Column --            | -- Type --             | -- Nullable --                                              | -- Default --
  order_id                | INTEGER                | NOT NULL                                                    | nextval('orders_order_id_seq'::regclass)
  customer_id             | INTEGER                | NOT NULL                                                    |
  status                  | VARCHAR(20)            | NOT NULL                                                    | 'pending'::character varying
@@ -65,8 +68,24 @@ select * from pg_help('orders');
                          |                        |                                                             |
  >> Referenced By >>     |                        |                                                             |
                          |                        |                                                             |
- public.order_items      | order_items_order_fk   | FOREIGN KEY (order_id) REFERENCES orders(order_id)          |
+ public.order_items      | order_items_order_fk   | FOREIGN KEY (order_id) REFERENCES orders(order_id)         |
 ```
+
+## Output
+
+Four `text` columns (`a`–`d`) containing section headers and data rows. Sections vary by relation type:
+
+| Section | a | b | c | d | Tables | Views | Mat. views |
+|---|---|---|---|---|:---:|:---:|:---:|
+| **Table** / **View** / **Materialized View** | name | comment | | | ✓ | ✓ | ✓ |
+| **Columns** | column name | data type | `NOT NULL` / `NULL` | default expression | ✓ | ✓ | ✓ |
+| **Definition** | SQL (one row per line) | | | | | ✓ | ✓ |
+| **Constraints** | type (`PRIMARY KEY`, `FOREIGN KEY`, `CHECK`, `UNIQUE`) | name | definition | | ✓ | | |
+| **Indexes** | type (`BTREE`, `UNIQUE BTREE`, etc.) | name | columns | `WHERE` clause | ✓ | | ✓ |
+| **Triggers** | trigger name | timing + level (`BEFORE ROW`, etc.) | events (`INSERT OR UPDATE`) | function | ✓ | ✓ | |
+| **Referenced By** | referencing table | constraint name | definition | | ✓ | | |
+
+If the relation does not exist, a single `Not found` row is returned.
 
 ## Requirements
 
@@ -74,7 +93,7 @@ PostgreSQL 12 or later. No extensions required.
 
 ## Examples
 
-The `examples/` folder contains a sample schema (two schemas, seven tables, three triggers) that exercises every section of the output:
+The `examples/` folder contains a sample schema (two schemas, seven tables, three views, three triggers) that exercises every section of the output:
 
 ```bash
 psql -d mydb -f pg_help.sql

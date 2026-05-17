@@ -10,6 +10,10 @@
 --   select * from pg_help('hr.departments');
 --   select * from pg_help('hr.employees');
 --   select * from pg_help('hr.job_history');
+--
+--   select * from pg_help('public.customer_orders');
+--   select * from pg_help('public.product_sales');
+--   select * from pg_help('hr.employee_directory');
 
 -- -----------------------------------------------------------------------
 -- customers
@@ -242,3 +246,70 @@ drop trigger if exists employees_normalize_name_trg on hr.employees;
 create trigger employees_normalize_name_trg
 before insert or update of first_name, last_name on hr.employees
 for each row execute function hr.employees_normalize_name();
+
+-- =========================================================================
+-- Views and materialized views
+-- =========================================================================
+
+-- -----------------------------------------------------------------------
+-- public.customer_orders
+-- A view joining customers and orders
+-- -----------------------------------------------------------------------
+
+drop view if exists public.customer_orders cascade;
+
+create view public.customer_orders as
+select
+    c.customer_id,
+    c.full_name,
+    c.email,
+    o.order_id,
+    o.status,
+    o.ordered_at
+from public.customers c
+inner join public.orders o on o.customer_id = c.customer_id;
+
+comment on view public.customer_orders is 'Orders with customer details, one row per order.';
+
+-- -----------------------------------------------------------------------
+-- public.product_sales
+-- A materialized view aggregating revenue per product, with an index
+-- -----------------------------------------------------------------------
+
+drop materialized view if exists public.product_sales cascade;
+
+create materialized view public.product_sales as
+select
+    p.product_id,
+    p.sku,
+    p.name,
+    sum(oi.qty)                    as total_qty_sold,
+    sum(oi.qty * oi.unit_price)    as total_revenue
+from public.products p
+inner join public.order_items oi on oi.product_id = p.product_id
+group by p.product_id, p.sku, p.name;
+
+comment on materialized view public.product_sales is 'Aggregated sales totals per product. Refresh with REFRESH MATERIALIZED VIEW.';
+
+create index product_sales_product_id_idx on public.product_sales (product_id);
+
+-- -----------------------------------------------------------------------
+-- hr.employee_directory
+-- A view joining employees with their department and manager name
+-- -----------------------------------------------------------------------
+
+drop view if exists hr.employee_directory cascade;
+
+create view hr.employee_directory as
+select
+    e.employee_id,
+    e.full_name,
+    e.email,
+    d.name                              as department,
+    m.full_name                         as manager,
+    e.hire_date
+from hr.employees e
+inner join hr.departments d on d.dept_id = e.dept_id
+left  join hr.employees m on m.employee_id = e.manager_id;
+
+comment on view hr.employee_directory is 'Employee listing with department and manager name.';
