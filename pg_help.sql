@@ -4,10 +4,10 @@ create or replace function pg_help
 )
 returns table
 (
-	col1 text,
-	col2 text,
-	col3 text,
-	col4 text
+	a text,
+	b text,
+	c text,
+	d text
 )
 as $$
 declare
@@ -58,13 +58,12 @@ begin
 
 	-- -----------------------------------------------------------------------
 	-- >> Columns >>
-	-- col1=name  col2=type  col3=nullable  col4=default
+	-- a=name  b=type  c=nullable  d=default
 	-- -----------------------------------------------------------------------
 
 	return query values
 		('>> Columns >>', '', '', ''),
-		('', '', '', ''),
-		('-- Column --', '-- Type --', '-- Nullable --', '-- Default --');
+		('', '', '', '');
 
 	return query
 	select
@@ -92,7 +91,7 @@ begin
 
 	-- -----------------------------------------------------------------------
 	-- >> Constraints >>
-	-- col1=type  col2=name  col3=definition
+	-- a=type  b=name  c=definition
 	-- -----------------------------------------------------------------------
 
 	return query values
@@ -123,7 +122,7 @@ begin
 
 	-- -----------------------------------------------------------------------
 	-- >> Indexes >>
-	-- col1=type  col2=name  col3=columns  col4=where clause
+	-- a=type  b=name  c=columns  d=where clause
 	-- -----------------------------------------------------------------------
 
 	return query values
@@ -151,7 +150,7 @@ begin
 
 	-- -----------------------------------------------------------------------
 	-- >> Triggers >>
-	-- col1=name  col2=timing+level  col3=events  col4=function
+	-- a=name  b=timing+level  c=events  d=function
 	-- -----------------------------------------------------------------------
 
 	return query values
@@ -187,7 +186,7 @@ begin
 
 	-- -----------------------------------------------------------------------
 	-- >> Referenced By >>
-	-- col1=from_table  col2=constraint_name  col3=definition
+	-- a=from_table  b=constraint_name  c=definition
 	-- -----------------------------------------------------------------------
 
 	return query values
