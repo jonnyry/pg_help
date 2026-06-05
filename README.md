@@ -98,7 +98,7 @@ Verbose mode (`true`) adds:
 
 ## Requirements
 
-PostgreSQL 18 or later. No extensions required.
+PostgreSQL 18 or later, no extensions are required.
 
 ## Testing
 
