@@ -1,10 +1,10 @@
 # pg_describe
 
-A PostgreSQL function that brings `psql`'s `\d` and `\d+` commands into SQL — returning the same relation descriptions as a regular result set you can query from any client.
+A PostgreSQL function that brings `psql`'s `\d` and `\d+` commands into SQL - returning the same relation descriptions as a regular result set you can query from any client.
 
 ## Why?
 
-Postgres has `\d name` in `psql`, but that's a client command — you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_describe` fills that gap with the same output, the same pattern syntax, and the same verbose mode.
+Postgres has `\d name` in `psql`, but that's a client command - you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_describe` fills that gap with the same output, the same pattern syntax, and the same verbose mode.
 
 ## Installation
 
@@ -36,7 +36,7 @@ select * from pg_describe('orders', true);
 
 ## Pattern rules
 
-Pattern syntax mirrors `psql` exactly:
+Pattern syntax mirrors `psql`:
 
 | Pattern | Meaning |
 |---|---|
@@ -51,7 +51,7 @@ Unquoted characters are folded to lower-case before matching, so `ORDERS`, `Orde
 
 ## Output
 
-Four `text` columns (`a`–`d`). With no argument, returns a listing:
+Four `text` columns (`a`, `b`, `c`, `d`). With no argument, returns a listing:
 
 | a | b | c | d |
 |---|---|---|---|
