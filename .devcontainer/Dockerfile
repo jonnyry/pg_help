@@ -1,8 +1,13 @@
 FROM mcr.microsoft.com/devcontainers/base:ubuntu
- 
+
+ARG PG_VERSION=18
+
 # Install Postgres
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql \
+    && apt-get install -y --no-install-recommends \
+        postgresql-${PG_VERSION} \
+        postgresql-${PG_VERSION}-pgtap \
+        postgresql-${PG_VERSION}-plpgsql-check \
     && rm -rf /var/lib/apt/lists/*
  
 # Listen on all interfaces, and trust loopback connections so connecting

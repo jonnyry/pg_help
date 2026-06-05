@@ -1,0 +1,42 @@
+name: Lint
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add PGDG repository
+        run: |
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+
+      - name: Install PostgreSQL 18 and plpgsql_check
+        run: sudo apt-get install -y postgresql-18 postgresql-18-plpgsql-check
+
+      - name: Configure and start PostgreSQL 18
+        run: |
+          sudo service postgresql stop
+          echo "port = 5432" | sudo tee -a /etc/postgresql/18/main/postgresql.conf > /dev/null
+          sudo sed -i '1i local all all trust' /etc/postgresql/18/main/pg_hba.conf
+          sudo pg_ctlcluster 18 main start
+
+      - name: Load pg_describe
+        run: psql -U postgres -f pg_describe.sql
+
+      - name: Run linter
+        run: make lint
+        env:
+          PGUSER: postgres

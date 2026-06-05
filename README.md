@@ -1,101 +1,127 @@
-# pg_help
+# pg_describe
 
-A PostgreSQL function that ports the spirit of SQL Server's `sp_help` stored procedure to Postgres. Returns a single result set describing the structure of a table, view, or materialized view.
+A PostgreSQL function that brings `psql`'s `\d` and `\d+` commands into SQL — returning the same relation descriptions as a regular result set you can query from any client.
 
 ## Why?
 
-In SQL Server, `sp_help 'mytable'` is the quickest way to get a summary of a relation's structure. Postgres has `\d name` in `psql`, but that's a client command — you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_help` fills that gap by returning the same kind of information as a regular result set.
+Postgres has `\d name` in `psql`, but that's a client command — you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_describe` fills that gap with the same output, the same pattern syntax, and the same verbose mode.
 
 ## Installation
 
-Run the function definition against your database:
-
 ```bash
-psql -d mydb -f pg_help.sql
+psql -d mydb -f pg_describe.sql
 ```
 
 ## Usage
 
-Pass a schema-qualified name, or just the name to use the current schema:
-
 ```sql
-select * from pg_help('public.orders');
+-- List all visible user relations  (\d)
+select * from pg_describe();
 
-select * from pg_help('orders');             -- uses current_schema()
+-- Describe a single relation
+select * from pg_describe('public.orders');
+select * from pg_describe('orders');           -- visibility search, like \d
 
-select * from pg_help('public.customer_orders');    -- view
+-- Wildcard patterns  (\d cust*)
+select * from pg_describe('cust*');
 
-select * from pg_help('public.product_sales');      -- materialized view
+-- Schema patterns
+select * from pg_describe('hr.*');             -- all objects in hr schema
+select * from pg_describe('*.employees');      -- employees in any schema
+select * from pg_describe('*.*');              -- everything in the database
+
+-- Verbose mode  (\d+)
+select * from pg_describe('orders', true);
 ```
 
-## Example output
+## Pattern rules
 
-```sql
-select * from pg_help('orders');
-```
+Pattern syntax mirrors `psql` exactly:
 
-```
- a                       | b                      | c                                                           | d
--------------------------+------------------------+-------------------------------------------------------------+-----------------------------------------
- >> Table >>             |                        |                                                             |
-                         |                        |                                                             |
- orders                  | Customer orders.       |                                                             |
-                         |                        |                                                             |
- >> Columns >>           |                        |                                                             |
-                         |                        |                                                             |
- order_id                | INTEGER                | NOT NULL                                                    | nextval('orders_order_id_seq'::regclass)
- customer_id             | INTEGER                | NOT NULL                                                    |
- status                  | VARCHAR(20)            | NOT NULL                                                    | 'pending'::character varying
- notes                   | TEXT                   | NULL                                                        |
- ordered_at              | TIMESTAMPTZ            | NOT NULL                                                    | now()
- shipped_at              | TIMESTAMPTZ            | NULL                                                        |
-                         |                        |                                                             |
- >> Constraints >>       |                        |                                                             |
-                         |                        |                                                             |
- PRIMARY KEY             | orders_pkey            | PRIMARY KEY (order_id)                                      |
- FOREIGN KEY             | orders_customer_fk     | FOREIGN KEY (customer_id) REFERENCES customers(customer_id) |
- CHECK                   | orders_status_ck       | CHECK ((status = ANY (ARRAY['pending','confirmed',...])))   |
-                         |                        |                                                             |
- >> Indexes >>           |                        |                                                             |
-                         |                        |                                                             |
- UNIQUE BTREE            | orders_pkey            | (order_id)                                                  |
- BTREE                   | orders_customer_id_idx | (customer_id)                                               |
- BTREE                   | orders_status_idx      | (status)                                                    |
-                         |                        |                                                             |
- >> Triggers >>          |                        |                                                             |
-                         |                        |                                                             |
- orders_lock_closed_trg  | BEFORE ROW             | UPDATE                                                      | public.orders_lock_closed
-                         |                        |                                                             |
- >> Referenced By >>     |                        |                                                             |
-                         |                        |                                                             |
- public.order_items      | order_items_order_fk   | FOREIGN KEY (order_id) REFERENCES orders(order_id)         |
-```
+| Pattern | Meaning |
+|---|---|
+| `*` | any sequence of characters |
+| `?` | any single character |
+| `"quoted"` | case-sensitive literal (`*` `?` `.` treated as plain chars) |
+| `schema.name` | match by schema; no visibility filter |
+| `name` (no dot) | match visible relations only |
+| `*.*` | all objects in all schemas (including system) |
+
+Unquoted characters are folded to lower-case before matching, so `ORDERS`, `Orders`, and `orders` all find `public.orders`.
 
 ## Output
 
-Four `text` columns (`a`–`d`) containing section headers and data rows. Sections vary by relation type:
+Four `text` columns (`a`–`d`). With no argument, returns a listing:
 
-| Section | a | b | c | d | Tables | Views | Mat. views |
-|---|---|---|---|---|:---:|:---:|:---:|
-| **Table** / **View** / **Materialized View** | name | comment | | | ✓ | ✓ | ✓ |
-| **Columns** | column name | data type | `NOT NULL` / `NULL` | default expression | ✓ | ✓ | ✓ |
-| **Definition** | SQL (one row per line) | | | | | ✓ | ✓ |
-| **Constraints** | type (`PRIMARY KEY`, `FOREIGN KEY`, `CHECK`, `UNIQUE`) | name | definition | | ✓ | | |
-| **Indexes** | type (`BTREE`, `UNIQUE BTREE`, etc.) | name | columns | `WHERE` clause | ✓ | | ✓ |
-| **Triggers** | trigger name | timing + level (`BEFORE ROW`, etc.) | events (`INSERT OR UPDATE`) | function | ✓ | ✓ | |
-| **Referenced By** | referencing table | constraint name | definition | | ✓ | | |
+| a | b | c | d |
+|---|---|---|---|
+| schema | relation name | type | owner |
 
-If the relation does not exist, a single `Not found` row is returned.
+With a pattern, returns full descriptions. Sections vary by relation type:
+
+| Section | a | b | c | d |
+|---|---|---|---|---|
+| Title | `Table "schema.name"` etc. | | | |
+| **Columns** | name | type | `not null` / `` | default |
+| **Indexes** | | definition | | |
+| **Check constraints** | | name | definition | |
+| **Foreign-key constraints** | | name | definition | |
+| **Referenced by** | table | constraint | definition | |
+| **Triggers** | name | timing + level | events | function |
+| **Partition key** *(partitioned)* | definition | | | |
+| **Server** *(foreign table)* | server name | | | |
+| **Sequence properties** | property | value | | |
+
+Verbose mode (`true`) adds:
+
+| Section | a | b | c | d |
+|---|---|---|---|---|
+| **Column details** | name | storage | stats target | comment |
+| **Not-null constraints** | | name | definition | |
+| **Definition** *(views)* | SQL line | | | |
+| Access method | `Access method: heap` | | | |
+
+## Relation types
+
+`pg_describe` handles all eight relation types that `\d` covers:
+
+| Type | `relkind` |
+|---|---|
+| Table | `r` |
+| Partitioned table | `p` |
+| View | `v` |
+| Materialized view | `m` |
+| Sequence | `S` |
+| Index | `i` |
+| Foreign table | `f` |
+| Composite type | `c` |
 
 ## Requirements
 
-PostgreSQL 12 or later. No extensions required.
+PostgreSQL 18 or later. No extensions required.
+
+## Testing
+
+Requires [pgTAP](https://pgtap.org/). Load the schema and run:
+
+```bash
+make setup
+make test
+```
+
+## Linting
+
+Requires [plpgsql_check](https://github.com/okbob/plpgsql_check). Analyses the PL/pgSQL function bodies for type mismatches, unused variables, and invalid embedded SQL:
+
+```bash
+make lint
+```
 
 ## Examples
 
-The `examples/` folder contains a sample schema (two schemas, seven tables, three views, three triggers) that exercises every section of the output:
+The `tests/test-schema.sql` file contains a sample schema (two schemas, seven tables, three views, three triggers, a partitioned table, a foreign table, and a composite type):
 
 ```bash
-psql -d mydb -f pg_help.sql
-psql -d mydb -f examples/example-schema.sql
+psql -d mydb -f pg_describe.sql
+psql -d mydb -f tests/test-schema.sql
 ```

@@ -1,19 +1,19 @@
--- Example schema for testing pg_help.
--- Run pg_help.sql first, then this file.
+-- Example schema for testing pg_describe.
+-- Run pg_describe.sql first, then this file.
 --
 -- Usage:
---   select * from pg_help('public.customers');
---   select * from pg_help('public.products');
---   select * from pg_help('public.orders');
---   select * from pg_help('public.order_items');
+--   select * from pg_describe('public.customers');
+--   select * from pg_describe('public.products');
+--   select * from pg_describe('public.orders');
+--   select * from pg_describe('public.order_items');
 --
---   select * from pg_help('hr.departments');
---   select * from pg_help('hr.employees');
---   select * from pg_help('hr.job_history');
+--   select * from pg_describe('hr.departments');
+--   select * from pg_describe('hr.employees');
+--   select * from pg_describe('hr.job_history');
 --
---   select * from pg_help('public.customer_orders');
---   select * from pg_help('public.product_sales');
---   select * from pg_help('hr.employee_directory');
+--   select * from pg_describe('public.customer_orders');
+--   select * from pg_describe('public.product_sales');
+--   select * from pg_describe('hr.employee_directory');
 
 -- -----------------------------------------------------------------------
 -- customers
@@ -38,7 +38,9 @@ create table public.customers
     constraint customers_credit_ck  check (credit_limit >= 0)
 );
 
-comment on table public.customers is 'Registered customers who can place orders.';
+comment on table  public.customers             is 'Registered customers who can place orders.';
+comment on column public.customers.email       is 'Normalised to lowercase by trigger.';
+comment on column public.customers.credit_limit is 'Maximum credit extended; 0 means no credit.';
 
 create index customers_full_name_idx on public.customers (full_name);
 
@@ -313,3 +315,82 @@ inner join hr.departments d on d.dept_id = e.dept_id
 left  join hr.employees m on m.employee_id = e.manager_id;
 
 comment on view hr.employee_directory is 'Employee listing with department and manager name.';
+
+-- =========================================================================
+-- Additional objects for pg_describe testing
+-- =========================================================================
+
+-- -----------------------------------------------------------------------
+-- Expression index and covering (INCLUDE) index
+-- Exercises: expression index columns, INCLUDE columns
+-- -----------------------------------------------------------------------
+
+drop index if exists public.customers_lower_full_name_idx;
+create index customers_lower_full_name_idx on public.customers (lower(full_name));
+
+drop index if exists public.orders_status_cover_idx;
+create index orders_status_cover_idx on public.orders (status) include (ordered_at, customer_id);
+
+-- -----------------------------------------------------------------------
+-- public.audit_log — partitioned table (RANGE on created_at)
+-- Exercises: partitioned table description
+-- -----------------------------------------------------------------------
+
+drop table if exists public.audit_log_2025 cascade;
+drop table if exists public.audit_log_2024 cascade;
+drop table if exists public.audit_log      cascade;
+
+create table public.audit_log
+(
+    id          bigint       generated always as identity,
+    event_type  text         not null,
+    payload     jsonb,
+    created_at  timestamptz  not null default now()
+)
+partition by range (created_at);
+
+comment on table public.audit_log is 'Audit log of system events, partitioned by creation date.';
+
+create table public.audit_log_2024
+    partition of public.audit_log
+    for values from ('2024-01-01') to ('2025-01-01');
+
+create table public.audit_log_2025
+    partition of public.audit_log
+    for values from ('2025-01-01') to ('2026-01-01');
+
+-- -----------------------------------------------------------------------
+-- public.external_prices — foreign table (file_fdw)
+-- Exercises: foreign table description, server, FDW options
+-- -----------------------------------------------------------------------
+
+create extension if not exists file_fdw;
+
+drop server      if exists local_files cascade;
+create server local_files foreign data wrapper file_fdw;
+
+drop foreign table if exists public.external_prices;
+create foreign table public.external_prices
+(
+    sku    text     not null,
+    price  numeric
+)
+server local_files
+options (filename '/tmp/prices.csv', format 'csv');
+
+comment on foreign table public.external_prices is 'Price feed imported from an external CSV file.';
+
+-- -----------------------------------------------------------------------
+-- public.address_type — composite type
+-- Exercises: composite type description
+-- -----------------------------------------------------------------------
+
+drop type if exists public.address_type cascade;
+create type public.address_type as
+(
+    street   text,
+    city     text,
+    country  text
+);
+
+comment on type public.address_type is 'Postal address composite type.';
