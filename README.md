@@ -1,10 +1,10 @@
 # pg_describe
 
-A PostgreSQL function that brings `psql`'s `\d` and `\d+` commands into SQL - returning the same relation descriptions as a regular result set you can query from any client.
+A PostgreSQL function that replicates `psql`'s `\d` and `\d+` commands in pure SQL - returning the same relation descriptions as a regular result set you can query from any client.
 
 ## Why?
 
-Postgres has `\d name` in `psql`, but that's a client command - you can't call it from a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_describe` fills that gap with the same output, the same pattern syntax, and the same verbose mode.
+Postgres has `\d name` in `psql`, but you can't call it over a regular SQL connection - a GUI, a notebook, an application, or anywhere else that just speaks SQL. `pg_describe` fills that gap with the same output, the same pattern syntax, and the same verbose mode.
 
 ## Installation
 

@@ -1,2 +1,2 @@
 title: pg_describe
-description: PostgreSQL function that mimics psql's \d and \d+ commands for describing database relations in pure SQL
+description: PostgreSQL function that replicates psql's \d and \d+ commands for describing database relations in pure SQL
