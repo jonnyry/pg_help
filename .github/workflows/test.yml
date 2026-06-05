@@ -10,8 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      PG_VERSION: 18
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Add PGDG repository
         run: |
@@ -23,15 +26,16 @@ jobs:
             > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update
 
-      - name: Install PostgreSQL 18 and pgTAP
-        run: sudo apt-get install -y postgresql-18 postgresql-18-pgtap
+      - name: Install PostgreSQL ${{ env.PG_VERSION }} and pgTAP
+        run: sudo apt-get install -y postgresql-${{ env.PG_VERSION }} postgresql-${{ env.PG_VERSION }}-pgtap
 
-      - name: Configure and start PostgreSQL 18
+      - name: Configure and start PostgreSQL ${{ env.PG_VERSION }}
         run: |
-          sudo service postgresql stop
-          echo "port = 5432" | sudo tee -a /etc/postgresql/18/main/postgresql.conf > /dev/null
-          sudo sed -i '1i local all all trust' /etc/postgresql/18/main/pg_hba.conf
-          sudo pg_ctlcluster 18 main start
+          sudo service postgresql stop || true
+          sudo pg_createcluster ${{ env.PG_VERSION }} main
+          echo "port = 5432" | sudo tee -a /etc/postgresql/${{ env.PG_VERSION }}/main/postgresql.conf > /dev/null
+          sudo sed -i '1i local all all trust' /etc/postgresql/${{ env.PG_VERSION }}/main/pg_hba.conf
+          sudo pg_ctlcluster ${{ env.PG_VERSION }} main start
 
       - name: Load schema
         run: make setup
