@@ -8,6 +8,7 @@ RUN apt-get update \
         postgresql-${PG_VERSION} \
         postgresql-${PG_VERSION}-pgtap \
         postgresql-${PG_VERSION}-plpgsql-check \
+        libtap-parser-sourcehandler-pgtap-perl \
     && rm -rf /var/lib/apt/lists/*
  
 # Listen on all interfaces, and trust loopback connections so connecting
