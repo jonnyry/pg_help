@@ -34,6 +34,10 @@ select * from pg_describe('*.*');              -- everything in the database
 select * from pg_describe('orders', true);
 ```
 
+## Screenshot
+
+![pg_describe screenshot](docs/images/screenshot-1.png)
+
 ## Pattern rules
 
 Pattern syntax mirrors `psql`:

@@ -22,6 +22,7 @@ jobs:
       - name: Prepare site
         run: |
           { head -1 README.md; printf '\n[View source on GitHub](https://github.com/${{ github.repository }})\n\n'; tail -n +2 README.md; } > docs/index.md
+          sed -i 's|docs/images/|images/|g' docs/index.md
       - uses: actions/configure-pages@v6
       - uses: actions/jekyll-build-pages@v1
         with:
