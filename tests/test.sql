@@ -289,11 +289,15 @@ select ok(
     'customers verbose: credit_limit column comment shown'
 );
 
-select ok(
-    exists(select 1 from pg_describe('public.customers', true)
-           where a = '>> Not-null constraints >>'),
-    'customers verbose: not-null constraints section present'
-);
+select case
+    when current_setting('server_version_num')::int >= 180000
+    then ok(
+        exists(select 1 from pg_describe('public.customers', true)
+               where a = '>> Not-null constraints >>'),
+        'customers verbose: not-null constraints section present'
+    )
+    else skip('Not-null constraints in pg_constraint require PG18+')
+end;
 
 select ok(
     exists(select 1 from pg_describe('public.customers', true)

@@ -1,6 +1,6 @@
 # pg_describe
 
-A PostgreSQL function that replicates `psql`'s `\d` and `\d+` commands in pure SQL - returning the same relation descriptions as a regular result set you can query from any client.
+A PostgreSQL function that replicates `psql`'s `\d` and `\d+` commands in pure SQL - returning the relation descriptions as a regular result set you can query from any SQL client.
 
 ## Why?
 
@@ -102,7 +102,7 @@ Verbose mode (`true`) adds:
 
 ## Requirements
 
-PostgreSQL 18 or later, no extensions are required.
+PostgreSQL 14-18 or later, no extensions are required.
 
 ## Testing
 
