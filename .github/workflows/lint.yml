@@ -13,8 +13,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
 
-    env:
-      PG_VERSION: 18
+    strategy:
+      matrix:
+        pg_version: [14, 15, 16, 17, 18]
 
     steps:
       - uses: actions/checkout@v6
@@ -29,16 +30,16 @@ jobs:
             > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update
 
-      - name: Install PostgreSQL ${{ env.PG_VERSION }} and plpgsql_check
-        run: sudo apt-get install -y postgresql-${{ env.PG_VERSION }} postgresql-${{ env.PG_VERSION }}-plpgsql-check
+      - name: Install PostgreSQL ${{ matrix.pg_version }} and plpgsql_check
+        run: sudo apt-get install -y postgresql-${{ matrix.pg_version }} postgresql-${{ matrix.pg_version }}-plpgsql-check
 
-      - name: Configure and start PostgreSQL ${{ env.PG_VERSION }}
+      - name: Configure and start PostgreSQL ${{ matrix.pg_version }}
         run: |
           sudo service postgresql stop || true
-          sudo pg_createcluster ${{ env.PG_VERSION }} main
-          echo "port = 5432" | sudo tee -a /etc/postgresql/${{ env.PG_VERSION }}/main/postgresql.conf > /dev/null
-          sudo sed -i '1i local all all trust' /etc/postgresql/${{ env.PG_VERSION }}/main/pg_hba.conf
-          sudo pg_ctlcluster ${{ env.PG_VERSION }} main start
+          sudo pg_createcluster ${{ matrix.pg_version }} main
+          echo "port = 5432" | sudo tee -a /etc/postgresql/${{ matrix.pg_version }}/main/postgresql.conf > /dev/null
+          sudo sed -i '1i local all all trust' /etc/postgresql/${{ matrix.pg_version }}/main/pg_hba.conf
+          sudo pg_ctlcluster ${{ matrix.pg_version }} main start
 
       - name: Load pg_describe
         run: psql -U postgres -f pg_describe.sql
