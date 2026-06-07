@@ -37,6 +37,7 @@ jobs:
       - name: Configure and start PostgreSQL ${{ matrix.pg_version }}
         run: |
           sudo service postgresql stop || true
+          sudo pg_dropcluster --stop ${{ matrix.pg_version }} main 2>/dev/null || true
           sudo pg_createcluster ${{ matrix.pg_version }} main
           echo "port = 5432" | sudo tee -a /etc/postgresql/${{ matrix.pg_version }}/main/postgresql.conf > /dev/null
           sudo sed -i '1i local all all trust' /etc/postgresql/${{ matrix.pg_version }}/main/pg_hba.conf
